@@ -33,7 +33,9 @@ void WorkerManager::onFrame()
     handleMoveWorkers();
     handleCombatWorkers();
 
-    if (Config::Strategy::StrategyName == "7HatchSpeed_NoUpgrades" || Config::Strategy::StrategyName == "7HatchSpeed_Upgrades") {
+    
+    if (BWAPI::Broodwar->self()->getRace() == BWAPI::Races::Zerg && UnitUtil::GetAllUnitCount(BWAPI::UnitTypes::Zerg_Drone) > 10) {
+        //if we have enough minerals to upgrade an existing creep colony to a sunken colony, and there is atleast one creep colony
         if (UnitUtil::GetAllUnitCount(BWAPI::UnitTypes::Zerg_Creep_Colony) > 0 && BWAPI::Broodwar->self()->minerals() > 50) {
             for (auto& unit : BWAPI::Broodwar->self()->getUnits()) {
                 if (unit->getType() == BWAPI::UnitTypes::Zerg_Creep_Colony) {
@@ -44,32 +46,15 @@ void WorkerManager::onFrame()
         if (UnitUtil::GetAllUnitCount(BWAPI::UnitTypes::Zerg_Hatchery)>1) {
             createSpine();
         }
+
+        if (UnitUtil::GetAllUnitCount(BWAPI::UnitTypes::Zerg_Hatchery) < 6) {
+            createMacroHatch();
+        }
     }
-
-    //if ((BWAPI::Broodwar->enemy()->getRace() == BWAPI::Races::Protoss || BWAPI::Broodwar->enemy()->getRace() == BWAPI::Races::Terran) && Global::Scout().m_workerScout) {
-    //    //printf("scout pos: %d, %d\n", Global::Scout().m_workerScout->getPosition().x, Global::Scout().m_workerScout->getPosition().x);
-    //    printf("working\n");
-    //    int countenemyunits = 0;
-    //    for (auto& unit : BWAPI::Broodwar->enemy()->getUnits()) {
-    //            printf("enemy unit -> %s\n",unit->getType().getName().c_str());
-    //            countenemyunits++;
-    //    }
-    //    int outcome;
-    //    if (countenemyunits > 0) {
-    //        printf("releasing scout\n");
-    //        outcome = Global::Scout().m_workerScout->move(BWAPI::Position(BWAPI::Broodwar->self()->getStartLocation().x*32, BWAPI::Broodwar->self()->getStartLocation().y*32));
-    //        printf("outcome: %d\n", outcome);
-    //        Global::Scout().releaseScout(Global::Scout().m_workerScout);
-    //    }
-    //}
-
-    if (UnitUtil::GetAllUnitCount(BWAPI::UnitTypes::Zerg_Hatchery)<6) {
-        createMacroHatch();
-    }
-
-    if (BWAPI::Broodwar->elapsedTime() > 10 * overlord_handling_call_count) {
+    if (BWAPI::Broodwar->self()->getRace() == BWAPI::Races::Zerg && BWAPI::Broodwar->getFrameCount()%1440 > 1340) {
         overlordHandling();
     }
+
 
     drawResourceDebugInfo();
     drawWorkerInformation(450, 20);
@@ -96,39 +81,25 @@ void WorkerManager::instantScout() {
 
 void WorkerManager::overlordHandling() {
 
-    /*for (auto& base : Global::Bases().getBaseLocations()) {
-        if (base->isStartLocation() || base->isOccupiedByPlayer(BWAPI::Broodwar->enemy()) || base->isOccupiedByPlayer(BWAPI::Broodwar->self())) {
-            continue;
-        }
-        if (BWAPI::Broodwar->isVisible(base->getDepotPosition())) {
-            continue;
-        }
-        for (auto& unit : BWAPI::Broodwar->self()->getUnits()) {
-            if (unit->getType() == BWAPI::UnitTypes::Zerg_Overlord && !unit->isMoving()) {
-                for (auto& myBase : Global::Bases().getOccupiedBaseLocations(BWAPI::Broodwar->self())) {
-                    if (unit->getPosition().x <= myBase->getPosition().x+400 && unit->getPosition().x >= myBase->getPosition().x- 400 && unit->getPosition().y <= myBase->getPosition().y + 400 && unit->getPosition().y >= myBase->getPosition().y - 400) {
-                            unit->move(base->getPosition());
-                            break;
-                    }
-                }
-            }
-        }
-    }*/
     BWAPI::Position basePos;
+    //for all overlords in our overlord management vector
     for (auto& overlord : Global::Workers().overlords_vector) {
+        // if overlord role is a number(made out of chars), it is a scout overlord
+        // if overlord is not scout nor wanderer - we do not move it in this piece of code
         if (!(overlord.role[0] >='0' && overlord.role[0] <= '9') && overlord.role!="wanderer") {
             continue;
         }
         basePos = overlord.assigned_base;
-        if (!(overlord.unit_identification->isMoving()) && 
+        //non moving scout overlords that arent in their destination move to their destination
+        if (!(overlord.unit_identification->isMoving()) && (overlord.role[0] >= '0' && overlord.role[0] <= '9') &&
             !(overlord.unit_identification->getPosition().x <= basePos.x + 400 && overlord.unit_identification->getPosition().x >= basePos.x - 400 && overlord.unit_identification->getPosition().y <= basePos.y + 400 && overlord.unit_identification->getPosition().y >= basePos.y - 400)) {
             overlord.unit_identification->move(basePos);
         }
-        if (overlord.role == "wanderer" && !overlord.unit_identification->isMoving()) {
+        //non moving wanderer overlords are queued their movement pattern
+        else if (overlord.role == "wanderer" && !overlord.unit_identification->isMoving()) {
             QueueWandererMovement(overlord.unit_identification);
         }
     }
-
 }
 
 
@@ -184,13 +155,14 @@ void WorkerManager::createSpine() {
     int def_structure_count = 0;
     def_structure_count += UnitUtil::GetAllUnitCount(BWAPI::UnitTypes::Zerg_Creep_Colony) + UnitUtil::GetAllUnitCount(BWAPI::UnitTypes::Zerg_Sunken_Colony);
 
+    //if the time is past 3 minutes and we have enough minerals for a creep colony and we have less than three def structures (3 is our goal)
     if (BWAPI::Broodwar->getFrameCount() > 24 * 60 * 3 && BWAPI::Broodwar->self()->minerals() > 75 && def_structure_count<3) {
-
+        //get our starting location
         const BaseLocation* homeBase = Global::Bases().getPlayerStartingBaseLocation(BWAPI::Broodwar->self());
         const BaseLocation* closestBase = nullptr;
         BWAPI::TilePosition existing_spine_pos;
         int minDistance = std::numeric_limits<int>::max();
-        //find natural
+        //find natural expansion
         for (auto& base : Global::Bases().getBaseLocations()) {
 
             if (base->getDepotPosition() == homeBase->getDepotPosition()) {
@@ -212,7 +184,7 @@ void WorkerManager::createSpine() {
         //check if natural has a hatchery, if not, just quit because there is little point making sunkens in the starting base
         for (auto& unit : BWAPI::Broodwar->self()->getUnits()) {
             if (unit->getType() == BWAPI::UnitTypes::Zerg_Hatchery && unit->isCompleted()) {
-                if (unit->getPosition().getApproxDistance(closestBase->getPosition()) < 500) {
+                if (closestBase && unit->getPosition().getApproxDistance(closestBase->getPosition()) < 500) {
                     checkForBaseInNatural = 1;
                 }
             }
@@ -220,12 +192,11 @@ void WorkerManager::createSpine() {
                 existing_spine_pos = unit->getTilePosition();
             }
         }
-        if(checkForBaseInNatural==0){
+        if(checkForBaseInNatural==0 && def_structure_count==0){
             return;
         }
 
         BWAPI::Unit creepColonyDrone;
-        bool outcome;
         // For each unit that we own
         for (auto& unit : BWAPI::Broodwar->self()->getUnits())
         {
@@ -237,14 +208,20 @@ void WorkerManager::createSpine() {
             }
         }
         if (creepColonyDrone) {
+            //if we are creating our first defensive structure - build it near our natural expansion
             if (def_structure_count == 0) {
                 BWAPI::TilePosition creepColonyPos = BWAPI::Broodwar->getBuildLocation(BWAPI::UnitTypes::Zerg_Creep_Colony, closestBase->getDepotPosition(), 10, true);
-                outcome = creepColonyDrone->build(BWAPI::UnitTypes::Zerg_Creep_Colony, creepColonyPos);
+                    if (creepColonyDrone) {
+                        creepColonyDrone->build(BWAPI::UnitTypes::Zerg_Creep_Colony, creepColonyPos);
+                    }
             }
+            //if we are creating a non-first defensive structure, build it near the existing ones
             else {
                 if (existing_spine_pos) {
                     BWAPI::TilePosition creepColonyPos = BWAPI::Broodwar->getBuildLocation(BWAPI::UnitTypes::Zerg_Creep_Colony, existing_spine_pos, 5, true);
-                    creepColonyDrone->build(BWAPI::UnitTypes::Zerg_Creep_Colony, creepColonyPos);
+                        if (creepColonyDrone) {
+                            creepColonyDrone->build(BWAPI::UnitTypes::Zerg_Creep_Colony, creepColonyPos);
+                        }
                 }
             }
         }
@@ -252,32 +229,35 @@ void WorkerManager::createSpine() {
 }
 
 void WorkerManager::createMacroHatch() {
-    int outcome = false;
+    //this code is only called if we have less than 6 hatcheries
+    //if we have more than 400 minerals
     if (BWAPI::Broodwar->self()->minerals() > 400) {
-        //printf("@@@@@@@@@@@@@@@@@@@@@@@@@@\nmacro hatch time!!!\n@@@@@@@@@@@@@@@@@@@@@@@\n");
-
         BWAPI::Unit macroHatchDrone;
         // For each unit that we own
         for (auto& unit : BWAPI::Broodwar->self()->getUnits())
         {
-            // if the unit is of the correct type, and it actually has been constructed, return it
+            // if the unit is of the correct type, and it actually has been constructed, return it, this is how we get our builder drone
             if (unit->getType() == BWAPI::UnitTypes::Zerg_Drone && unit->isCompleted())
             {
                 macroHatchDrone = unit;
                 break;
             }
         }
+        //if the drone is well at this point
         if (macroHatchDrone) {
-            //printf("\nmacro hatch drone acquired\n");
+            //get our start position
             BWAPI::TilePosition startPos = BWAPI::Broodwar->self()->getStartLocation();
+            //get the build location
             BWAPI::TilePosition macroHatchPos = BWAPI::Broodwar->getBuildLocation(BWAPI::UnitTypes::Zerg_Hatchery, startPos, 200, false);
+            //if the position is not valid, return
             if (macroHatchPos == BWAPI::TilePositions::Invalid) {
-                //printf("finding pos failed\n");
+                return;
             }
-            outcome = macroHatchDrone->build(BWAPI::UnitTypes::Zerg_Hatchery, macroHatchPos);
+            //if the position is valid, and the drone is still fine, build the hatchery at the correct location
+            if (macroHatchDrone) {
+                    macroHatchDrone->build(BWAPI::UnitTypes::Zerg_Hatchery, macroHatchPos);
+            }
         }
-        /*Global::Workers().numOfMacroHatcheries() += 1;
-        printf("creating macro hatch\n\n");*/
     }
 }
 
@@ -328,7 +308,7 @@ void WorkerManager::stopRepairing(BWAPI::Unit worker)
 
 void WorkerManager::handleGasWorkers()
 {
-    if ((Config::Strategy::StrategyName == "7HatchSpeed_NoUpgrades" || Config::Strategy::StrategyName == "7HatchSpeed_Upgrades") && GasThreshold()==0) {
+    if ((Config::Strategy::StrategyName == "7HatchSpeed_NoUpgrades") && GasThreshold()==0) {
         Global::Workers().GasThreshold() += 100;
     }
     // for each unit we have
@@ -339,17 +319,17 @@ void WorkerManager::handleGasWorkers()
         {
             // get the number of workers currently assigned to it
             const int numAssigned = m_workerData.getNumAssignedWorkers(unit);
-            int early_gascount_offset = 0;
+            // if we got a lot of gas (>1000), take two thirds of gas drones and put them to minerals
+            int high_gas_gathered_offset = 0;
 
             // if it's less than we want it to be, fill 'er up // changed for stopping gas at 100 for ling speed
             if (GasThreshold()==0 || GasThreshold()>BWAPI::Broodwar->self()->gatheredGas() || ((BWAPI::Broodwar->elapsedTime()>(12*60)) && Config::Strategy::StrategyName != "7HatchSpeed_NoUpgrades" && Config::Strategy::StrategyName != "7HatchSpeed_Upgrades") || BWAPI::Broodwar->elapsedTime() > (10 * 60))
             {
                 //printf("\n\n%d,       %d\n\n",GasThreshold(),BWAPI::Broodwar->elapsedTime());
-                if (Config::Strategy::StrategyName == "7HatchSpeed_NoUpgrades" && BWAPI::Broodwar->getFrameCount() / (24 * 60) < 11) {
-                    //early_gascount_offset++;
-                    //for now I dont want to integrate this, as it is causing too much gas strain
+                if (BWAPI::Broodwar->self()->gas() > 1000) {
+                    high_gas_gathered_offset = 2;
                 }
-                for (int i = 0; i < (Config::Macro::WorkersPerRefinery - numAssigned - early_gascount_offset); ++i)
+                for (int i = 0; i < (Config::Macro::WorkersPerRefinery - numAssigned - high_gas_gathered_offset); ++i)
                 {
                     BWAPI::Unit gasWorker = getGasWorker(unit);
                     if (gasWorker)

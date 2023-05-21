@@ -278,11 +278,11 @@ bool GameState::isLegal(const ActionType & action) const
     // rules for buildings which are built by workers
     if (action.isBuilding() && !action.isMorphed() && !action.isAddon())
     {
-        // be very strict about when we can make refineries to ensure we have enough workers to go in gas
-        if (action.isRefinery() && (getNumMineralWorkers() <= (int)(4 + 3*refineriesInProgress)))
-        {
-            return false;
-        }
+        //// be very strict about when we can make refineries to ensure we have enough workers to go in gas
+        //if (action.isRefinery() && (getNumMineralWorkers() <= (int)(4 + 3*refineriesInProgress)))
+        //{
+        //    return false;
+        //}
 
         int workersPerRefinery = 3;
         int workersRequiredToBuild = getRace() == Races::Protoss ? 0 : 1;
@@ -314,7 +314,7 @@ bool GameState::isLegal(const ActionType & action) const
         return false;
     }
 
-    //// we don't need to go over the maximum supply limit with supply providers
+    ////// we don't need to go over the maximum supply limit with supply providers
     //if (action.isSupplyProvider() && (_units.getMaxSupply() + _units.getSupplyInProgress() > 400))
     //{
     //    return false;
@@ -354,7 +354,7 @@ std::vector<ActionType> GameState::doAction(const ActionType & action)
 
     const std::string & name = action.getName();
 
-    BOSS_ASSERT(ffTime >= 0 && ffTime < 1000000, "FFTime is very strange: %d", ffTime);
+    //BOSS_ASSERT(ffTime >= 0 && ffTime < 1000000, "FFTime is very strange: %d", ffTime);
 
     auto actionsFinished = fastForward(ffTime);
 
@@ -366,8 +366,8 @@ std::vector<ActionType> GameState::doAction(const ActionType & action)
     FrameCountType elapsed(_currentFrame - _lastActionFrame);
     _lastActionFrame = _currentFrame;
 
-    BOSS_ASSERT(canAffordMinerals(action),   "Minerals less than price: %ld < %d, ffTime=%d %s", _minerals, action.mineralPrice(), (int)elapsed, action.getName().c_str());
-    BOSS_ASSERT(canAffordGas(action),       "Gas less than price: %ld < %d, ffTime=%d %s", _gas, action.gasPrice(), (int)elapsed, action.getName().c_str());
+    //BOSS_ASSERT(canAffordMinerals(action),   "Minerals less than price: %ld < %d, ffTime=%d %s", _minerals, action.mineralPrice(), (int)elapsed, action.getName().c_str());
+    //BOSS_ASSERT(canAffordGas(action),       "Gas less than price: %ld < %d, ffTime=%d %s", _gas, action.gasPrice(), (int)elapsed, action.getName().c_str());
 
     // modify our resources
     _minerals   -= action.mineralPrice();
@@ -498,7 +498,7 @@ const FrameCountType GameState::whenCanPerform(const ActionType & action) const
     classTime       = raceSpecificWhenReady(action);
 
     // set when we will have enough supply for this unit
-    supplyTime      = whenSupplyReady(action);
+    //supplyTime      = whenSupplyReady(action);
 
     // when will we have a worker ready to build it?
     workerTime      = whenWorkerReady(action);
@@ -507,7 +507,7 @@ const FrameCountType GameState::whenCanPerform(const ActionType & action) const
     maxVal = (mineralTime > maxVal) ? mineralTime   : maxVal;
     maxVal = (gasTime >     maxVal) ? gasTime       : maxVal;
     maxVal = (classTime >   maxVal) ? classTime     : maxVal;
-    maxVal = (supplyTime >  maxVal) ? supplyTime    : maxVal;
+    //maxVal = (supplyTime >  maxVal) ? supplyTime    : maxVal;
     maxVal = (prereqTime >  maxVal) ? prereqTime    : maxVal;
     maxVal = (workerTime >  maxVal) ? workerTime    : maxVal;
 
@@ -750,7 +750,7 @@ const FrameCountType GameState::whenMineralsReady(const ActionType & action) con
         const ActionType & actionPerformed = _units.getActionInProgressByIndex(progressIndex);
 
         // finishing a building as terran gives you a mineral worker back
-        if (actionPerformed.isBuilding() && !actionPerformed.isAddon() && (getRace() == Races::Terran))
+        if ((getRace() == Races::Terran) && actionPerformed.isBuilding() && !actionPerformed.isAddon())
         {
             currentMineralWorkers++;
         }

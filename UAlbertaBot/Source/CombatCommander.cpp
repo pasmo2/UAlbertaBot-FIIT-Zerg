@@ -99,36 +99,34 @@ void CombatCommander::updateAttackSquads()
 {
     Squad& mainAttackSquad = m_squadData.getSquad("MainAttack");
 
-    if(mainAttackSquad.getUnits().size() > 20) {
-        int squad_overlords = 0;
-        //count overlords marked as squad ones
-        for (auto& overlord : Global::Workers().overlords_vector) {
-            if (overlord.role == "squad") {
-                squad_overlords++;
-            }
-        }
-        // I want two squad overlords, if there are two, this does not run, if there are less, it will run until it sets two
-        for (int i = 0; i < 2 - squad_overlords; i++) {
+    if (BWAPI::Broodwar->self()->getRace() == BWAPI::Races::Zerg) {
+        //if our squad has atleast 20 units, and it is past 10 minutes - which is the time squad overlords become relevant
+        if (mainAttackSquad.getUnits().size() > 20 || BWAPI::Broodwar->getFrameCount() > 10*(24*60)) {
+            int squad_overlords = 0;
+            //count overlords marked as squad ones
             for (auto& overlord : Global::Workers().overlords_vector) {
-                if (overlord.role == "unset") {
-                    overlord.role = "squad";
-                    m_squadData.assignUnitToSquad(overlord.unit_identification, mainAttackSquad);
-
-                    /*printf("ATTACK SQUAD UNITS:\n");
-                    for (auto& unit : mainAttackSquad.getUnits()) {
-                        printf("%s\n", unit->getType().getName().c_str());
-                    }*/
-
-                    break;
+                if (overlord.role == "squad") {
+                    squad_overlords++;
+                }
+            }
+            // I want two squad overlords, if there are two, this does not run, if there are less, it will run until it sets two
+            for (int i = 0; i < 2 - squad_overlords; i++) {
+                for (auto& overlord : Global::Workers().overlords_vector) {
+                    //assign squad overlords
+                    if (overlord.role == "unset") {
+                        overlord.role = "squad";
+                        m_squadData.assignUnitToSquad(overlord.unit_identification, mainAttackSquad);
+                        break;
+                    }
                 }
             }
         }
-    }
-    else {
-        for (auto& unit : mainAttackSquad.getUnits()) {
-            if (unit->getType() == BWAPI::UnitTypes::Zerg_Overlord) {
-                mainAttackSquad.removeUnit(unit);
-                printf("overlord removed from attack squad, too few army units!!\n");
+        //remove squad overlords because of too few army units in the squad
+        else {
+            for (auto& unit : mainAttackSquad.getUnits()) {
+                if (unit->getType() == BWAPI::UnitTypes::Zerg_Overlord) {
+                    mainAttackSquad.removeUnit(unit);
+                }
             }
         }
     }
@@ -518,7 +516,7 @@ BWAPI::Position CombatCommander::getMainAttackLocation()
     //    //printf("\n --------------TURNING OFF ATTACKING ----------\n");
     //    return BWAPI::Position(BWAPI::Broodwar->self()->getStartLocation().x * 32, BWAPI::Broodwar->self()->getStartLocation().y * 32);
     //}
-    if (BWAPI::Broodwar->elapsedTime() < 300 && BWAPI::Broodwar->enemy()->getRace() == BWAPI::Races::Zerg && BWAPI::Broodwar->self()->getRace() == BWAPI::Races::Zerg) {
+    if (BWAPI::Broodwar->elapsedTime() < 300 && BWAPI::Broodwar->enemy()->getRace() == BWAPI::Races::Zerg && BWAPI::Broodwar->self()->getRace() == BWAPI::Races::Zerg && Config::Strategy::StrategyName != "Zerg_ZerglingRush") {
         return BWAPI::Position(BWAPI::Broodwar->self()->getStartLocation().x * 32, BWAPI::Broodwar->self()->getStartLocation().y * 32);
     }
 

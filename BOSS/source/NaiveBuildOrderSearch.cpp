@@ -78,7 +78,6 @@ const BuildOrder & NaiveBuildOrderSearch::solve()
     {
         const ActionType & type = requiredToBuild.getActionType(a);
         buildOrder.add(type);
-        //printf("ACTIONTYPE 1:   %s\n", type.getName().c_str());
     }
 
     // Add some workers to the build order if we don't have many, this usually gives a lower upper bound
@@ -94,9 +93,6 @@ const BuildOrder & NaiveBuildOrderSearch::solve()
         int numNeeded = need - have - buildOrder.getTypeCount(actionType);
         
         buildOrder.add(actionType, numNeeded);
-        if (actionType.getUnitType() == BWAPI::UnitTypes::Zerg_Hydralisk_Den) {
-            //printf("ACTIONTYPE 2:   %s, count needed: %d\n", actionType.getName().c_str(), numNeeded);
-        }
     }
 
     // if we are zerg, make sure we have enough morphers for morphed units
@@ -272,8 +268,7 @@ const BuildOrder & NaiveBuildOrderSearch::solve()
 			currentSupply = _state.getUnitData().getCurrentSupply();
 			supplyInProgress = _state.getUnitData().getSupplyInProgress();
 		}
-
-		BOSS_ASSERT(_state.isLegal(nextAction), "Should be able to build the next action now");
+		BOSS_ASSERT(_state.isLegal(nextAction), nextAction.getName().c_str());
 		finalBuildOrder.add(nextAction);
 		_state.doAction(nextAction);
 	}

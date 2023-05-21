@@ -158,10 +158,12 @@ void BuildingManager::constructAssignedBuildings()
             else
             {
                 // issue the build order!
-                b.builderUnit->build(b.type,b.finalPosition);
+                if (b.builderUnit) {
+                    b.builderUnit->build(b.type, b.finalPosition);
 
-                // set the flag to true
-                b.buildCommandGiven = true;
+                    // set the flag to true
+                    b.buildCommandGiven = true;
+                }
             }
         }
     }

@@ -101,13 +101,11 @@ void ScoutManager::moveScouts()
         }
     }
 
-    //hopefully sends scout back
     if (enemyBaseLocation) {
-        if ((m_workerScout->getDistance(enemyBaseLocation->getPosition()) < 150 && BWAPI::Broodwar->enemy()->getRace() == BWAPI::Races::Zerg) || 
-            (m_workerScout->getDistance(enemyBaseLocation->getPosition()) < 350 && BWAPI::Broodwar->enemy()->getRace() != BWAPI::Races::Zerg)) {
+        //sends our scout back after coming close enough to see the enemy starting base location
+        if (m_workerScout->getDistance(enemyBaseLocation->getPosition()) < 200) {
             m_workerScout->move(BWAPI::Position(BWAPI::Broodwar->self()->getStartLocation().x * 32, BWAPI::Broodwar->self()->getStartLocation().y * 32), false);
             releaseScout(m_workerScout);
-            printf("released scout FIRST CONDITION\n");
             return;
         }
     }
@@ -132,6 +130,11 @@ void ScoutManager::moveScouts()
         if (scoutHP < m_previousScoutHP)
         {
             m_scoutUnderAttack = true;
+            if (m_workerScout->getDistance(enemyBaseLocation->getPosition()) < 1000) {
+                m_workerScout->move(BWAPI::Position(BWAPI::Broodwar->self()->getStartLocation().x * 32, BWAPI::Broodwar->self()->getStartLocation().y * 32), false);
+                releaseScout(m_workerScout);
+                return;
+            }
         }
 
         if (!m_workerScout->isUnderAttack() && !enemyWorkerInRadius())

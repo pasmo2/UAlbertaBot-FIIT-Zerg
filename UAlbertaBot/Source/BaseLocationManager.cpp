@@ -304,7 +304,7 @@ BWAPI::TilePosition BaseLocationManager::getNextExpansion(BWAPI::Player player) 
             for (auto& unit : BWAPI::Broodwar->getAllUnits())
             {
 
-                if (!(unit->isFlying()) && unit->getTilePosition().x <= base->getDepotPosition().x+1 && unit->getTilePosition().x >= base->getDepotPosition().x -1 && unit->getTilePosition().y <= base->getDepotPosition().y + 1 && unit->getTilePosition().y >= base->getDepotPosition().y - 1) {
+                if (unit->getType() != BWAPI::UnitTypes::Zerg_Overlord && unit->getTilePosition().x <= base->getDepotPosition().x+1 && unit->getTilePosition().x >= base->getDepotPosition().x -1 && unit->getTilePosition().y <= base->getDepotPosition().y + 1 && unit->getTilePosition().y >= base->getDepotPosition().y - 1) {
                     unitBlocking = true;
                     break;
                 }

@@ -486,7 +486,6 @@ const bool GameState::checkFull(const size_t & player) const
 {
     if (numUnits(player) >= Constants::Max_Units)
     {
-		printf("numunits --- %d\n", numUnits(player));//CHECK THIS, ITERATE FURTHER -- NEED TO FIX MAX SUPPLY SHIT
         std::stringstream ss;
         ss << "GameState has too many units. Constants::Max_Units = " << Constants::Max_Units;
         System::FatalError(ss.str());

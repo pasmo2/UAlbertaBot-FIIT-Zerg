@@ -18,15 +18,16 @@ ProductionManager::ProductionManager()
 void ProductionManager::setBuildOrder(const BuildOrder & buildOrder)
 {
     m_queue.clearAll();
-    //printf("setting build order\n");
     for (size_t i(0); i<buildOrder.size(); ++i)
     {
-        if (buildOrder[i].getUnitType() != BWAPI::UnitTypes::Zerg_Hydralisk_Den && 
-            !(buildOrder[i].getUnitType() == BWAPI::UnitTypes::Zerg_Extractor && BWAPI::Broodwar->elapsedTime() < 400 && BWAPI::Broodwar->enemy()->getRace() == BWAPI::Races::Zerg) &&
-            !(buildOrder[i].getUpgradeType() == BWAPI::UpgradeTypes::Metabolic_Boost && BWAPI::Broodwar->self()->gas() == 0)) {
-            m_queue.queueAsLowestPriority(buildOrder[i], true);
+        if (!(buildOrder[i].getUnitType() == BWAPI::UnitTypes::Zerg_Hydralisk_Den && Config::Strategy::StrategyName == "7HatchSpeed_NoUpgrades") &&
+            !(buildOrder[i].getUnitType() == BWAPI::UnitTypes::Zerg_Extractor && BWAPI::Broodwar->elapsedTime() < 400 && BWAPI::Broodwar->enemy()->getRace() == BWAPI::Races::Zerg && Config::Strategy::StrategyName == "7HatchSpeed_NoUpgrades") &&
+            !(buildOrder[i].getUpgradeType() == BWAPI::UpgradeTypes::Metabolic_Boost && BWAPI::Broodwar->self()->gas() == 0 && Config::Strategy::StrategyName == "7HatchSpeed_NoUpgrades")) {
+            //if (!(UnitUtil::GetAllUnitCount(BWAPI::UnitTypes::Zerg_Spire) > 0 && buildOrder[i].getUnitType() == BWAPI::UnitTypes::Zerg_Spire) &&
+                //!(UnitUtil::GetAllUnitCount(BWAPI::UnitTypes::Zerg_Hydralisk_Den) > 0 && buildOrder[i].getUnitType() == BWAPI::UnitTypes::Zerg_Hydralisk_Den)) {
+                m_queue.queueAsLowestPriority(buildOrder[i], true);
+            //}
         }
-        //printf("unit: %s\n",buildOrder[i].getUnitType().getName().c_str());
     }
 }
 
@@ -168,11 +169,11 @@ void ProductionManager::manageBuildOrderQueue()
     // the current item to be used
     BuildOrderItem & currentItem = m_queue.getHighestPriorityItem();
 
-    if ((Config::Strategy::StrategyName == "7HatchSpeed_NoUpgrades" || Config::Strategy::StrategyName == "7HatchSpeed_Upgrades") &&
+    /*if ((Config::Strategy::StrategyName == "7HatchSpeed_NoUpgrades") &&
         BWAPI::Broodwar->self()->gas() < 50 && m_queue.getHighestPriorityItem().metaType.getName() == BWAPI::UnitTypes::Zerg_Lair.getName()) {
         m_queue.removeHighestPriorityItem();
         printf("\nremoved lair tech\n");
-    }
+    }*/
     //if zvz, dont expand instantly or you can just lose to zergling opener
     if (BWAPI::Broodwar->enemy()->getRace() == BWAPI::Races::Zerg && BWAPI::Broodwar->self()->getRace() == BWAPI::Races::Zerg &&
         m_queue.getHighestPriorityItem().metaType.getName() == BWAPI::UnitTypes::Zerg_Hatchery.getName() &&

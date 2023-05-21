@@ -119,12 +119,7 @@ void GameCommander::handleUnitAssignments()
 	setValidUnits();
 
 	// set each type of unit
-	if (BWAPI::Broodwar->enemy()->getRace() == BWAPI::Races::Zerg && BWAPI::Broodwar->self()->getRace() == BWAPI::Races::Zerg) {
-		if (BWAPI::Broodwar->elapsedTime()>60) {
-			setScoutUnits();
-		}
-	}
-	else if(!(BWAPI::Broodwar->self()->getRace() == BWAPI::Races::Zerg) || BWAPI::Broodwar->elapsedTime()>200) {
+	if (BWAPI::Broodwar->elapsedTime()>60) {
 		setScoutUnits();
 	}
 	setCombatUnits();
@@ -158,7 +153,6 @@ void GameCommander::setScoutUnits()
 		// if it exists
 		if (supplyProvider)
 		{
-			printf("%d\n", std::rand());
 			// grab the closest worker to the supply provider to send to scout
 			BWAPI::Unit workerScout = getClosestWorkerToTarget(supplyProvider->getPosition());
 
@@ -235,40 +229,42 @@ void GameCommander::onUnitHide(BWAPI::Unit unit)
 	Global::Info().onUnitHide(unit); 
 }
 
-void GameCommander::onUnitCreate(BWAPI::Unit unit)		
-{ 
+void GameCommander::onUnitCreate(BWAPI::Unit unit)
+{
 	Global::Info().onUnitCreate(unit);
-	if (unit->getType() == BWAPI::UnitTypes::Zerg_Overlord) {
-		for (unsigned int i = 0; i < Global::Workers().overlords_vector.size(); i++) {
-			if (Global::Workers().overlords_vector[i].unit_identification->getID() == unit->getID()) {
-				return;
-			}
-		}
-		OverlordInfo newOverlord;
-		newOverlord.unit_identification = unit;
-		newOverlord.role = "unset";
-		Global::Workers().overlords_vector.push_back(newOverlord);
-		// for all bases
-		int last_unset_overlord_index = 0;
-		for (auto& base : Global::Bases().getBaseLocations()) {
-			// if base location is not start, is not occupied by self or enemy
-			if ((!(base->isStartLocation()) && (BWAPI::Broodwar->getFrameCount() / (24 * 60) < 5))
-				&& !(base->isOccupiedByPlayer(BWAPI::Broodwar->self())) && !(base->isOccupiedByPlayer(BWAPI::Broodwar->enemy()))) {
-				// figure out if the base is already set for an overlord, if not, add it to the first unset one
-				last_unset_overlord_index = -1;
-				for (unsigned int i = 0; i < Global::Workers().overlords_vector.size(); i++) {
-					if (Global::Workers().overlords_vector[i].role == "unset") {
-						last_unset_overlord_index = i;
-					}
-					if (Global::Workers().overlords_vector[i].role == std::to_string(base->m_baseID)) {
-						//mark last unset overlord index as -1, which means I am not putting this base into an another overlord
-						last_unset_overlord_index = -1;
-						break;
-					}
+		if(BWAPI::Broodwar->self()->getRace() == BWAPI::Races::Zerg){
+		if (unit->getType() == BWAPI::UnitTypes::Zerg_Overlord) {
+			for (unsigned int i = 0; i < Global::Workers().overlords_vector.size(); i++) {
+				if (Global::Workers().overlords_vector[i].unit_identification->getID() == unit->getID()) {
+					return;
 				}
-				if (last_unset_overlord_index != -1) {
-					Global::Workers().overlords_vector[last_unset_overlord_index].role = std::to_string(base->m_baseID);
-					Global::Workers().overlords_vector[last_unset_overlord_index].assigned_base = base->getPosition();
+			}
+			OverlordInfo newOverlord;
+			newOverlord.unit_identification = unit;
+			newOverlord.role = "unset";
+			Global::Workers().overlords_vector.push_back(newOverlord);
+			// for all bases
+			int last_unset_overlord_index = 0;
+			for (auto& base : Global::Bases().getBaseLocations()) {
+				// if base location is not start, is not occupied by self or enemy
+				if ((!(base->isStartLocation()) && (BWAPI::Broodwar->getFrameCount() / (24 * 60) < 5))
+					&& !(base->isOccupiedByPlayer(BWAPI::Broodwar->self())) && !(base->isOccupiedByPlayer(BWAPI::Broodwar->enemy()))) {
+					// figure out if the base is already set for an overlord, if not, add it to the first unset one
+					last_unset_overlord_index = -1;
+					for (unsigned int i = 0; i < Global::Workers().overlords_vector.size(); i++) {
+						if (Global::Workers().overlords_vector[i].role == "unset") {
+							last_unset_overlord_index = i;
+						}
+						if (Global::Workers().overlords_vector[i].role == std::to_string(base->m_baseID)) {
+							//mark last unset overlord index as -1, which means I am not putting this base into an another overlord
+							last_unset_overlord_index = -1;
+							break;
+						}
+					}
+					if (last_unset_overlord_index != -1) {
+						Global::Workers().overlords_vector[last_unset_overlord_index].role = std::to_string(base->m_baseID);
+						Global::Workers().overlords_vector[last_unset_overlord_index].assigned_base = base->getPosition();
+					}
 				}
 			}
 		}
@@ -290,65 +286,56 @@ void GameCommander::onUnitDestroy(BWAPI::Unit unit)
 	Global::Production().onUnitDestroy(unit);
 	Global::Workers().onUnitDestroy(unit);
 	Global::Info().onUnitDestroy(unit);
+	if (BWAPI::Broodwar->self()->getRace() == BWAPI::Races::Zerg) {
+		if (BWAPI::Broodwar->self()->supplyUsed() < 260 && Config::Micro::UseSparcraftSimulation == false) {
+				Config::Micro::UseSparcraftSimulation = true;
+			}
 
-	if (BWAPI::Broodwar->self()->supplyUsed() < 260 && Config::Micro::UseSparcraftSimulation == false) {
-		Config::Micro::UseSparcraftSimulation = true;
-		printf("TURNING ON SPARCRAFT --- UNIT COUNT BECAME TOO LOW\n");
-	}
-
-	//remove overlord from overlord management vector
-	if (unit->getType() == BWAPI::UnitTypes::Zerg_Overlord) {
-		for (unsigned int i = 0; i < Global::Workers().overlords_vector.size(); i++) {
-			if (Global::Workers().overlords_vector[i].unit_identification->getID() == unit->getID()) {
-				/*printf("@@@@@@@@@@@@@@@@@@@@@@@@@@@ before remove: @@@@@@@@@@@@@@@@@@@@@@@@@@@\n");
-				for (int j = 0; j < Global::Workers().overlords_vector.size(); j++) {
-					printf("%d\n", Global::Workers().overlords_vector[j].unit_identification->getID());
-					printf("%s\n", Global::Workers().overlords_vector[j].unit_identification->getType().getName().c_str());
-				}*/
-				Global::Workers().overlords_vector.erase(Global::Workers().overlords_vector.begin() + i);
-				/*printf("@@@@@@@@@@@@@@@@@@@@@@@@@@@ after remove: @@@@@@@@@@@@@@@@@@@@@@@@@@@\n");
-				for (int j = 0; j < Global::Workers().overlords_vector.size(); j++) {
-					printf("%d\n", Global::Workers().overlords_vector[j].unit_identification->getID());
-					printf("%s\n", Global::Workers().overlords_vector[j].unit_identification->getType().getName().c_str());
-				}*/
-				break;
+		//remove overlord from overlord management vector
+		if (unit->getType() == BWAPI::UnitTypes::Zerg_Overlord) {
+			for (unsigned int i = 0; i < Global::Workers().overlords_vector.size(); i++) {
+				if (Global::Workers().overlords_vector[i].unit_identification->getID() == unit->getID()) {
+					Global::Workers().overlords_vector.erase(Global::Workers().overlords_vector.begin() + i);
+					break;
+				}
 			}
 		}
-	}
 
-	if (unit->getType() == BWAPI::UnitTypes::Zerg_Overlord && unit->getPlayer() == BWAPI::Broodwar->self()) {
-		Global::Production().m_queue.queueAsHighestPriority(UAlbertaBot::MetaType(BWAPI::UnitTypes::Zerg_Overlord), true, false);
-		printf("OVERLORD DIED, ADDING ONE TO THE QUEUE ASAP\n");
-	}
+		if (unit->getType() == BWAPI::UnitTypes::Zerg_Overlord && unit->getPlayer() == BWAPI::Broodwar->self()) {
+			Global::Production().m_queue.queueAsHighestPriority(UAlbertaBot::MetaType(BWAPI::UnitTypes::Zerg_Overlord), true, false);
+		}
 
-	if (unit->getPlayer() == BWAPI::Broodwar->enemy() && (unit->getType() == BWAPI::UnitTypes::Protoss_Dark_Templar || unit->getType() == BWAPI::UnitTypes::Zerg_Lurker) &&
-		BWAPI::Broodwar->self()->supplyUsed() < 260) {
-		printf("\nTURUNING SPARCRAFT BACK ON\n");
-		Config::Micro::UseSparcraftSimulation = true;
-	}
+		if (unit->getPlayer() == BWAPI::Broodwar->enemy() && (unit->getType() == BWAPI::UnitTypes::Protoss_Dark_Templar || unit->getType() == BWAPI::UnitTypes::Zerg_Lurker) &&
+			BWAPI::Broodwar->self()->supplyUsed() < 260) {
+			Config::Micro::UseSparcraftSimulation = true;
+		}
 
-	//if a unit dies - check if there is a cloaked unit somewhere in enemies army - if so, send a squad overlord to its position
-	for (auto& enemyUnit : BWAPI::Broodwar->enemy()->getUnits()) {
-		if (enemyUnit->getType() == BWAPI::UnitTypes::Zerg_Lurker || 
-			enemyUnit->getType() == BWAPI::UnitTypes::Terran_Ghost || 
-			enemyUnit->getType() == BWAPI::UnitTypes::Terran_Wraith ||
-			enemyUnit->getType() == BWAPI::UnitTypes::Protoss_Dark_Templar) {
-			for (auto& myUnit: BWAPI::Broodwar->self()->getUnits()) {
-				if (myUnit->getDistance(enemyUnit->getPosition()) < 200) {
-					for (auto& overlord : Global::Workers().overlords_vector) {
-						if (overlord.role == "squad") {
-							overlord.unit_identification->move(enemyUnit->getPosition());
-							printf("\n@@@@@@@@@@@@@@@@@@@\nMOVING SQUAD OVERLORD TO CLOAKED UNIT\n@@@@@@@@@@@@@@@@@@\n");
-							Config::BWAPIOptions::SetLocalSpeed = 50;
-							printf("\nTURNING SPARCRAFT OFF \n");
-							Config::Micro::UseSparcraftSimulation = false;
-							break;
+		//if a unit dies - check if there is a cloaked unit somewhere in enemies army - if so, send a squad overlord to its position
+		for (auto& enemyUnit : BWAPI::Broodwar->enemy()->getUnits()) {
+			if (enemyUnit->getType() == BWAPI::UnitTypes::Zerg_Lurker ||
+				enemyUnit->getType() == BWAPI::UnitTypes::Terran_Ghost ||
+				enemyUnit->getType() == BWAPI::UnitTypes::Terran_Wraith ||
+				enemyUnit->getType() == BWAPI::UnitTypes::Protoss_Dark_Templar) {
+				for (auto& myUnit : BWAPI::Broodwar->self()->getUnits()) {
+					if (myUnit->getDistance(enemyUnit->getPosition()) < 200) {
+						for (auto& overlord : Global::Workers().overlords_vector) {
+							if (overlord.role == "squad") {
+								overlord.unit_identification->move(enemyUnit->getPosition());
+								Config::BWAPIOptions::SetLocalSpeed = 50;
+								Config::Micro::UseSparcraftSimulation = false;
+								break;
+							}
 						}
 					}
 				}
 			}
 		}
 	}
+	
+
+
+
+	
 }
 
 
@@ -357,70 +344,69 @@ void GameCommander::onUnitMorph(BWAPI::Unit unit)
 	Global::Info().onUnitMorph(unit);
 	Global::Workers().onUnitMorph(unit);
 
-	//if morphed unit gets us to over 150 supply, disable SparCraft
-	if (BWAPI::Broodwar->self()->supplyUsed() > 260 && Config::Micro::UseSparcraftSimulation == true) {
-		Config::Micro::UseSparcraftSimulation = false;
-		printf("TURNING OFF SPARCRAFT --- TOO MANY UNITS TO HANDLE\n");
-	}
-
-
-	if (unit->getType() == BWAPI::UnitTypes::Zerg_Overlord) {
-		for (unsigned int i = 0; i < Global::Workers().overlords_vector.size(); i++) {
-			if (Global::Workers().overlords_vector[i].unit_identification->getID() == unit->getID()) {
-				return;
-			}
+	if (BWAPI::Broodwar->self()->getRace() == BWAPI::Races::Zerg) {
+		//if morphed unit gets us to over 130 supply, disable SparCraft
+		if (BWAPI::Broodwar->self()->supplyUsed() > 260 && Config::Micro::UseSparcraftSimulation == true) {
+			Config::Micro::UseSparcraftSimulation = false;
 		}
-		OverlordInfo newOverlord;
-		newOverlord.unit_identification = unit;
-		newOverlord.role = "unset";
-		Global::Workers().overlords_vector.push_back(newOverlord);
-		// for all bases
-		int last_unset_overlord_index = 0;
-		int existing_squad_overlord = 0;
-		for (auto& overlord : Global::Workers().overlords_vector) {
-			if (overlord.role == "squad") {
-				existing_squad_overlord++;
-			}
-		}
-		//printf("\nbase search:\n");
-		for (auto& base : Global::Bases().getBaseLocations()) {
-			// if base location is not start, is not occupied by self or enemy
-			if ((!(base->isStartLocation()) && ((BWAPI::Broodwar->getFrameCount() / (24 * 60) < 5) || existing_squad_overlord > 0))
-				&& !(base->isOccupiedByPlayer(BWAPI::Broodwar->enemy()))) {
-				//printf("available bases -> %d\n",base->m_baseID);
-				// figure out if the base is already set for an overlord, if not, add it to the first unset one
-				last_unset_overlord_index = -1;
-				for (unsigned int i = 0; i < Global::Workers().overlords_vector.size(); i++) {
-					if (Global::Workers().overlords_vector[i].role == "unset") {
-						last_unset_overlord_index = i;
-					}
-					if (Global::Workers().overlords_vector[i].role == std::to_string(base->m_baseID)) {
-						//mark last unset overlord index as -1, which means I am not putting this base into an another overlord
-						last_unset_overlord_index = -1;
-						break;
-					}
-				}
-				if (last_unset_overlord_index != -1) {
-					//printf("setting base %d\n", base->m_baseID);
-					Global::Workers().overlords_vector[last_unset_overlord_index].role = std::to_string(base->m_baseID);
-					Global::Workers().overlords_vector[last_unset_overlord_index].assigned_base = base->getPosition();
+
+		//                   setting overlord roles
+		// if the morphed unit is an Overlord
+		if (unit->getType() == BWAPI::UnitTypes::Zerg_Overlord) {
+			for (unsigned int i = 0; i < Global::Workers().overlords_vector.size(); i++) {
+				if (Global::Workers().overlords_vector[i].unit_identification->getID() == unit->getID()) {
+					return;
 				}
 			}
-		}
-
-		if (existing_squad_overlord > 1) {
+			//initialize new Overlord 
+			OverlordInfo newOverlord;
+			newOverlord.unit_identification = unit;
+			//starts with role "unset"
+			newOverlord.role = "unset";
+			Global::Workers().overlords_vector.push_back(newOverlord);
+			
+			int last_unset_overlord_index = 0;
+			int existing_squad_overlord = 0;
+			//count existing squad overlords
 			for (auto& overlord : Global::Workers().overlords_vector) {
-				if (overlord.role == "unset") {
-					overlord.role = "wanderer";
+				if (overlord.role == "squad") {
+					existing_squad_overlord++;
+				}
+			}
+			// for all bases
+			for (auto& base : Global::Bases().getBaseLocations()) {
+				// in the early game, the only eligible bases are bases that are not start locations or occupied by enemy
+				// later on, we can add all starting locations as well, because earlier on we did not know which one was enemy's starting base - by the 5 minute mark we certainly do
+				if ((!(base->isStartLocation()) && ((BWAPI::Broodwar->getFrameCount() / (24 * 60) < 5) || existing_squad_overlord > 0))
+					&& !(base->isOccupiedByPlayer(BWAPI::Broodwar->enemy()))) {
+					// figure out if the base is already set for an overlord, if not, add it to the first unset one
+					last_unset_overlord_index = -1;
+					for (unsigned int i = 0; i < Global::Workers().overlords_vector.size(); i++) {
+						if (Global::Workers().overlords_vector[i].role == "unset") {
+							last_unset_overlord_index = i;
+						}
+						if (Global::Workers().overlords_vector[i].role == std::to_string(base->m_baseID)) {
+							//mark last unset overlord index as -1, which means I am not assigning this base to an another overlord
+							last_unset_overlord_index = -1;
+							break;
+						}
+					}
+					//can assign the base to an overlord - which makes it a scout overlord (assigned to a specific base, so there are no conflicts inbetween different overlords)
+					if (last_unset_overlord_index != -1) {
+						Global::Workers().overlords_vector[last_unset_overlord_index].role = std::to_string(base->m_baseID);
+						Global::Workers().overlords_vector[last_unset_overlord_index].assigned_base = base->getPosition();
+					}
+				}
+			}
+			//if we have enough squad overlords, we can start adding wanderers
+			if (existing_squad_overlord > 1) {
+				for (auto& overlord : Global::Workers().overlords_vector) {
+					if (overlord.role == "unset") {
+						overlord.role = "wanderer";
+					}
 				}
 			}
 		}
-
-		/*printf("\nprinting overlords:\n");
-		for (auto& overlord : Global::Workers().overlords_vector) {
-			printf("%s\n",overlord.role.c_str());
-		}*/
-
 	}
 }
 

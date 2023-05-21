@@ -7,8 +7,10 @@
 #include "WorkerManager.h"
 #include "Logger.h"
 #include <fstream>
+#include <iostream>
 #include <stdio.h>
 #include <string>
+#include <sstream>
 #include "BaseLocationManager.h"
 
 
@@ -299,17 +301,34 @@ const MetaPairVector StrategyManager::getZergBuildOrderGoal() const
     int mutasWanted = numMutas + 6;
     int hydrasWanted = numHydras + 6;
 
+    if (BWAPI::Broodwar->getFrameCount() / (24 * 60) > 5 && numDrones < 6 + (BWAPI::Broodwar->getFrameCount() / (24 * 60))) {
+        goal.push_back(std::pair<MetaType, int>(BWAPI::UnitTypes::Zerg_Drone, numDrones + 1));
+    }
+
     //fix the lack of gas/ling speed if starting against zerg - where we skip these to survive a potential ling rush from the opponent
-    if (UnitUtil::GetAllUnitCount(BWAPI::UnitTypes::Zerg_Extractor) == 0) {
+    if (UnitUtil::GetAllUnitCount(BWAPI::UnitTypes::Zerg_Extractor) == 0 && BWAPI::Broodwar->elapsedTime() > 400) {
         goal.push_back(std::pair<MetaType, int>(BWAPI::UnitTypes::Zerg_Extractor, 1));
     }
-    if (BWAPI::Broodwar->self()->getUpgradeLevel(BWAPI::UpgradeTypes::Metabolic_Boost) == 0 && BWAPI::Broodwar->self()->gas() > 0) {
+    if (BWAPI::Broodwar->self()->getUpgradeLevel(BWAPI::UpgradeTypes::Metabolic_Boost) == 0 && BWAPI::Broodwar->self()->gas() > 0 &&
+        Config::Strategy::StrategyName != "Zerg_2HatchHydra" && Config::Strategy::StrategyName != "Zerg_3HatchMuta" &&
+        Config::Strategy::StrategyName != "Zerg_3HatchScourge") {
         goal.push_back(std::pair<MetaType, int>(BWAPI::UpgradeTypes::Metabolic_Boost, 1));
+    }
+    //add overlord speed if possible
+    if (UnitUtil::GetAllUnitCount(BWAPI::UnitTypes::Zerg_Lair) > 0) {
+        goal.push_back(std::pair<MetaType, int>(BWAPI::UpgradeTypes::Pneumatized_Carapace, 1));
     }
 
     if (Config::Strategy::StrategyName == "Zerg_ZerglingRush")
     {
         goal.push_back(std::pair<MetaType, int>(BWAPI::UnitTypes::Zerg_Zergling, zerglings + 6));
+    }
+    else if (Config::Strategy::StrategyName == "Zerg_9Pool")
+    {
+        goal.push_back(std::pair<MetaType, int>(BWAPI::UnitTypes::Zerg_Hydralisk, numHydras + 4));
+        goal.push_back(std::pair<MetaType, int>(BWAPI::UnitTypes::Zerg_Zergling, zerglings + 3));
+        goal.push_back(std::pair<MetaType, int>(BWAPI::UpgradeTypes::Grooved_Spines, 1));
+        goal.push_back(std::pair<MetaType, int>(BWAPI::UnitTypes::Zerg_Drone, numDrones + 3));
     }
     else if (Config::Strategy::StrategyName == "Zerg_2HatchHydra")
     {
@@ -319,7 +338,7 @@ const MetaPairVector StrategyManager::getZergBuildOrderGoal() const
     }
     else if (Config::Strategy::StrategyName == "Zerg_3HatchMuta")
     {
-        goal.push_back(std::pair<MetaType, int>(BWAPI::UnitTypes::Zerg_Hydralisk, numHydras + 12));
+        goal.push_back(std::pair<MetaType, int>(BWAPI::UnitTypes::Zerg_Mutalisk, numMutas + 8));
         goal.push_back(std::pair<MetaType, int>(BWAPI::UnitTypes::Zerg_Drone, numDrones + 4));
     }
     else if (Config::Strategy::StrategyName == "Zerg_3HatchScourge")
@@ -342,7 +361,7 @@ const MetaPairVector StrategyManager::getZergBuildOrderGoal() const
         goal.push_back(std::pair<MetaType, int>(BWAPI::UpgradeTypes::Metabolic_Boost, 1));
         goal.push_back(std::pair<MetaType, int>(BWAPI::UnitTypes::Zerg_Drone, numDrones + 4));
     }
-    else if (Config::Strategy::StrategyName == "7HatchSpeed_NoUpgrades" || Config::Strategy::StrategyName == "7HatchSpeed_Upgrades")
+    else if (Config::Strategy::StrategyName == "7HatchSpeed_NoUpgrades")
     {
         goal.push_back(std::pair<MetaType, int>(BWAPI::UnitTypes::Zerg_Zergling, zerglings + 4));
         if (UnitUtil::GetAllUnitCount(BWAPI::UnitTypes::Zerg_Spire) > 0) {
@@ -357,7 +376,6 @@ const MetaPairVector StrategyManager::getZergBuildOrderGoal() const
         }
         if (UnitUtil::GetAllUnitCount(BWAPI::UnitTypes::Zerg_Spire) == 0 && UnitUtil::GetAllUnitCount(BWAPI::UnitTypes::Zerg_Lair) > 0) {
             goal.push_back(std::pair<MetaType, int>(BWAPI::UnitTypes::Zerg_Spire, 1));
-            goal.push_back(std::pair<MetaType, int>(BWAPI::UpgradeTypes::Pneumatized_Carapace, 1));
         }
         //drone up in this interval
         if (BWAPI::Broodwar->getFrameCount()/(24*60) > 10 && BWAPI::Broodwar->getFrameCount() / (24 * 60) < 20) {
@@ -368,7 +386,7 @@ const MetaPairVector StrategyManager::getZergBuildOrderGoal() const
             goal.push_back(std::pair<MetaType, int>(BWAPI::UnitTypes::Zerg_Evolution_Chamber, 1));
             if (UnitUtil::GetAllUnitCount(BWAPI::UnitTypes::Zerg_Evolution_Chamber)) {
                 goal.push_back(std::pair<MetaType, int>(BWAPI::UpgradeTypes::Zerg_Carapace, 1));
-                //if +1 armor is done, get +1 melee attacks
+                //upgrade to lair if we are getting gas already
                 if (UnitUtil::GetAllUnitCount(BWAPI::UnitTypes::Zerg_Lair) == 0) {
                     for (auto& unit : BWAPI::Broodwar->self()->getUnits()) {
                         if (unit->getType() == BWAPI::UnitTypes::Zerg_Hatchery) {
@@ -377,55 +395,24 @@ const MetaPairVector StrategyManager::getZergBuildOrderGoal() const
                         }
                     }
                 }
+                //if +1 armor is done, get +1 melee attacks
                 if (BWAPI::Broodwar->self()->getUpgradeLevel(BWAPI::UpgradeTypes::Zerg_Carapace) == 1) {
                     goal.push_back(std::pair<MetaType, int>(BWAPI::UpgradeTypes::Zerg_Melee_Attacks, 1));
                 }
             }
         }
-        if (Config::Strategy::StrategyName == "7HatchSpeed_Upgrades") {
-            if (BWAPI::Broodwar->elapsedTime() > 300 && UnitUtil::GetAllUnitCount(BWAPI::UnitTypes::Zerg_Evolution_Chamber) == 0) {
-                //printf("@@@@@@@@\nEVOCHAMBER TIME\n@@@@@@@@@@@@");
-                evo_chamber_made = 1;
-                goal.push_back(std::pair<MetaType, int>(BWAPI::UnitTypes::Zerg_Evolution_Chamber, UnitUtil::GetAllUnitCount(BWAPI::UnitTypes::Zerg_Evolution_Chamber) +1));
-            }
-            if (BWAPI::Broodwar->elapsedTime() > 335) {
-                if (meleeAttackOneGas == 0) {
-                    //printf("setting melee attack gas");
-                    meleeAttackOneGas = 1;
-                    Global::Workers().GasThreshold() += 100;//SOMEHOW GET THIS NUMBER FROM BWAPI
-                }
-                if (carapaceOneGas == 0) {
-                    //printf("setting carapace gas");
-                    carapaceOneGas = 1;
-                    Global::Workers().GasThreshold() += 100;//SOMEHOW GET THIS NUMBER FROM BWAPI
-                }
-                if (hydra_den_from_boss == 0 && BWAPI::Broodwar->elapsedTime() > 450) {
-                    hydra_den_from_boss = 1;
-                    //printf("setting hydraden gas");
-                    Global::Workers().GasThreshold() += 50;
-                }
-                if (BWAPI::Broodwar->elapsedTime() > 360 && UnitUtil::GetAllUnitCount(BWAPI::UnitTypes::Zerg_Evolution_Chamber)>=1) {
-                    if (BWAPI::Broodwar->self()->gas() >= 100) {
-                        goal.push_back(std::pair<MetaType, int>(BWAPI::UpgradeTypes::Zerg_Melee_Attacks, 1));
-                    }
-                    if (BWAPI::Broodwar->self()->gas() >= 100) {
-                        goal.push_back(std::pair<MetaType, int>(BWAPI::UpgradeTypes::Zerg_Carapace, 1));
-                    }
-                }
-            }
-        }
 
 
     }
 
-    if (BWAPI::Broodwar->self()->minerals() > 1000 && BWAPI::Broodwar->self()->gas() < 200 && UnitUtil::GetAllUnitCount(BWAPI::UnitTypes::Zerg_Extractor)) {
+    //if we have way too many minerals and we are low on gas
+    if (BWAPI::Broodwar->self()->minerals() > 1000 && BWAPI::Broodwar->self()->gas() < 200) {
         goal.push_back(std::pair<MetaType, int>(BWAPI::UnitTypes::Zerg_Extractor, UnitUtil::GetAllUnitCount(BWAPI::UnitTypes::Zerg_Extractor) + 1));
     }
-
+    //setting default extractor creation in intervals >15, >18 min
     if (BWAPI::Broodwar->getFrameCount()/(24*60) > 15 && UnitUtil::GetAllUnitCount(BWAPI::UnitTypes::Zerg_Extractor) < 2) {
         goal.push_back(std::pair<MetaType, int>(BWAPI::UnitTypes::Zerg_Extractor, UnitUtil::GetAllUnitCount(BWAPI::UnitTypes::Zerg_Extractor) + 1));
     }
-
     if (BWAPI::Broodwar->getFrameCount() / (24 * 60) > 18 && UnitUtil::GetAllUnitCount(BWAPI::UnitTypes::Zerg_Extractor) < 3) {
         goal.push_back(std::pair<MetaType, int>(BWAPI::UnitTypes::Zerg_Extractor, UnitUtil::GetAllUnitCount(BWAPI::UnitTypes::Zerg_Extractor) + 1));
     }
@@ -441,7 +428,7 @@ const MetaPairVector StrategyManager::getZergBuildOrderGoal() const
         goal.push_back(std::pair<MetaType, int>(BWAPI::UnitTypes::Zerg_Overlord, UnitUtil::GetAllUnitCount(BWAPI::UnitTypes::Zerg_Overlord) + 1));
     }
 
-    if (UnitUtil::GetAllUnitCount(BWAPI::UnitTypes::Zerg_Drone) > 30 && BWAPI::Broodwar->self()->minerals() > 1000 && BWAPI::Broodwar->self()->supplyTotal() < 200) {
+    if (UnitUtil::GetAllUnitCount(BWAPI::UnitTypes::Zerg_Drone) > 30 && BWAPI::Broodwar->self()->minerals() > 800 && BWAPI::Broodwar->self()->supplyTotal() < 380) {
         goal.push_back(std::pair<MetaType, int>(BWAPI::UnitTypes::Zerg_Overlord, UnitUtil::GetAllUnitCount(BWAPI::UnitTypes::Zerg_Overlord)+5));
     }
     return goal;
@@ -493,7 +480,7 @@ void StrategyManager::readResults()
     }
     else
     {
-        BWAPI::Broodwar->printf("No results file found: %s", enemyResultsFile.c_str());
+        //BWAPI::Broodwar->printf("No results file found: %s", enemyResultsFile.c_str());
     }
 }
 
@@ -535,124 +522,124 @@ void StrategyManager::onEnd(const bool isWinner)
     meleeAttackOneGas = 0;
     evo_chamber_made = 0;
     Global::Workers().initialScout() = 0;
-    string MatchOutcome, enemyRace;
-    int selfScore, frameCount;
-    string Strategy = Config::Strategy::StrategyName;
-    const BWAPI::Player enemy = BWAPI::Broodwar->enemy();
-    const BWAPI::Player self = BWAPI::Broodwar->self();
-    BWAPI::Race enemyRaceEnum = enemy->getRace();
-    string mapName = BWAPI::Broodwar->mapFileName();
+    //string MatchOutcome, enemyRace;
+    //int selfScore, frameCount;
+    //string Strategy = Config::Strategy::StrategyName;
+    //const BWAPI::Player enemy = BWAPI::Broodwar->enemy();
+    //const BWAPI::Player self = BWAPI::Broodwar->self();
+    //BWAPI::Race enemyRaceEnum = enemy->getRace();
+    //string mapName = BWAPI::Broodwar->mapFileName();
 
-    selfScore = self->getBuildingScore() + self->getKillScore() + self->getRazingScore() + self->getUnitScore() + self->gatheredGas() + self->gatheredMinerals();
-    //printf("buildingscore:%d\nkillscore:%d\nrazingscore:%d\nunitscore:%d\n", self->getBuildingScore(), self->getKillScore(), self->getRazingScore(), self->getUnitScore());
+    //selfScore = self->getBuildingScore() + self->getKillScore() + self->getRazingScore() + self->getUnitScore() + self->gatheredGas() + self->gatheredMinerals();
+    ////printf("buildingscore:%d\nkillscore:%d\nrazingscore:%d\nunitscore:%d\n", self->getBuildingScore(), self->getKillScore(), self->getRazingScore(), self->getUnitScore());
 
-    if (isWinner) {
-        MatchOutcome = "Win";
-    }
-    else {
-        MatchOutcome = "Loss";
-    }
+    //if (isWinner) {
+    //    MatchOutcome = "Win";
+    //}
+    //else {
+    //    MatchOutcome = "Loss";
+    //}
 
-    if (enemyRaceEnum == BWAPI::Races::Zerg) {
-        enemyRace = "Zerg";
-    }
-    else if (enemyRaceEnum == BWAPI::Races::Terran) {
-        enemyRace = "Terran";
-    }
-    else if (enemyRaceEnum == BWAPI::Races::Protoss) {
-        enemyRace = "Protoss";
-    }
-    else {
-        enemyRace = "Unknown";
-    }
+    //if (enemyRaceEnum == BWAPI::Races::Zerg) {
+    //    enemyRace = "Zerg";
+    //}
+    //else if (enemyRaceEnum == BWAPI::Races::Terran) {
+    //    enemyRace = "Terran";
+    //}
+    //else if (enemyRaceEnum == BWAPI::Races::Protoss) {
+    //    enemyRace = "Protoss";
+    //}
+    //else {
+    //    enemyRace = "Unknown";
+    //}
 
-    frameCount = BWAPI::Broodwar->getFrameCount();
+    //frameCount = BWAPI::Broodwar->getFrameCount();
 
-    string frameCountStr = to_string(frameCount), selfScoreStr = to_string(selfScore);
+    /*string frameCountStr = to_string(frameCount), selfScoreStr = to_string(selfScore);
 
 
-    string myData = MatchOutcome +","+ mapName.c_str() + "," + enemyRace.c_str() + "," + Strategy.c_str() + "," + frameCountStr + "," + selfScoreStr + "\n";
+    string myData = MatchOutcome + "," + mapName.c_str() + "," + enemyRace.c_str() + "," + Strategy.c_str() + "," + frameCountStr + "," + selfScoreStr + "\n";
 
 
     std::ofstream file;
-    file.open("C:/Users/adam/Desktop/scbwdata.csv",std::ios::app);
+    file.open("C:/Users/adam/Desktop/scbwdata.csv", std::ios::app);
     file << myData;
-    file.close();
+    file.close();*/
 
 
-    /*string enemyRace = BWAPI::Broodwar->enemy()->getRace().c_str();
+    string enemyRace = BWAPI::Broodwar->enemy()->getRace().c_str();
     string mapName = BWAPI::Broodwar->mapFileName().c_str();
-    string pathStart = "C:/Users/adam/Desktop/scbw_records/Zerg_2HatchHydra/";
+    string pathStart = "C:/Users/adam/Desktop/scbw_records_2/" + Config::Strategy::StrategyName + "/";
     string slash = "/";
     string pathWins = "/wins.txt", pathLosses = "/losses.txt", pathWinrate = "/winrate.txt";
     string fullPathWin = pathStart + mapName + slash + enemyRace + pathWins;
     string fullPathLoss = pathStart + mapName + slash + enemyRace + pathLosses;
     string fullPathWinrateFile = pathStart + mapName + slash + enemyRace + pathWinrate;
-
-    double winrate, wins, losses;
-    fstream winFile, lossFile;
-
-
-    printf("------------- %s ------------------", fullPathWin);
+    string fullPathFrameCount = pathStart + "framecount.txt";
+    int wins, losses;
+    fstream winFile, lossFile, frameFile;
+    //printf("------------- %s ------------------", fullPathWin.c_str());
     winFile.open(fullPathWin);
     winFile >> wins;
     winFile.close();
     lossFile.open(fullPathLoss);
     lossFile >> losses;
     lossFile.close();
-    ofstream winratefile(fullPathWinrateFile, std::ofstream::trunc);
-    winrate = (wins / (wins + losses) * 100);
-    winratefile << winrate;
-    winratefile.close();
-    printf("current winrate: %lf\n", winrate);*/
-
+    std::ofstream fileFrameCount(fullPathFrameCount, std::ios::app);
+    fileFrameCount << BWAPI::Broodwar->getFrameCount() << "\n";
+    fileFrameCount.close();
+    /*if ((wins + losses) > 1) {
+        ofstream winratefile(fullPathWinrateFile, std::ofstream::trunc);
+        winrate = (wins / (wins + losses) * 100);
+        winratefile << winrate;
+        winratefile.close();
+        printf("\ncurrent winrate: %lf\n", winrate);
+    }*/
 
 
     if (isWinner)
-    {   
-        
+    {
+
         m_strategies[Config::Strategy::StrategyName].m_wins++;
 
-       /* int wins;
-       fstream wrFile;
-        wrFile.open(fullPathWin);
-        wrFile >> wins;
-        wrFile.close();
-        ofstream ofs(fullPathWin, std::ofstream::trunc);
-        ofs << wins + 1;
-        ofs.close();
-        printf("\nwins: %d\n", wins);*/
-        //zvz test quick data
-        std::string filename = "C:/Users/adam/Desktop/zvztest.txt";
-        std::string line = "WIN";
+        /*fstream wrFile;
+         wrFile.open(fullPathWin);
+         wrFile >> wins;
+         wrFile.close();*/
+         ofstream ofs(fullPathWin, std::ofstream::trunc);
+         ofs << wins + 1;
+         ofs.close();
+         printf("\nwins: %d\n", wins);
+        // //zvz test quick data
+        //std::st/*ring filename = "C:/Users/adam/Desktop/zvztest.txt";
+        /*std::string line = "WIN";
         std::ofstream file(filename, std::ios::app);
         file << line << "\n";
-        file.close();
+        file.close();*/
 
 
         printf("\nWINNER-------------------------\n");
-        
+
     }
     else
     {
         m_strategies[Config::Strategy::StrategyName].m_losses++;
 
-        /*int losses;
-        fstream wrFile;
+        /*fstream wrFile;
         wrFile.open(fullPathLoss);
         wrFile >> losses;
-        wrFile.close();
+        wrFile.close();*/
         ofstream ofs(fullPathLoss, std::ofstream::trunc);
         ofs << losses + 1;
         ofs.close();
-        printf("\nlosses: %d\n", losses);*/
+        printf("\nlosses: %d\n", losses);
 
-        //zvz test quick data
-        std::string filename = "C:/Users/adam/Desktop/zvztest.txt";
-        std::string line = "LOSS";
-        std::ofstream file(filename, std::ios::app);
-        file << line << "\n";
-        file.close();
+        ////zvz test quick data
+        //std::string filename = "C:/Users/adam/Desktop/zvztest.txt";
+        //std::string line = "LOSS";
+        //std::ofstream file(filename, std::ios::app);
+        //file << line << "\n";
+        //file.close();
 
         printf("\nLOSER-------------------------\n");
     }
